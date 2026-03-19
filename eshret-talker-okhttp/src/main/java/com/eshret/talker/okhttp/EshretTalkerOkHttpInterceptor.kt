@@ -9,7 +9,7 @@ import okhttp3.MediaType
 import okhttp3.Response
 
 // Этот файл описывает OkHttp-interceptor библиотеки eshret_talker.
-// Здесь мы делаем понятные HTTP-логи в стиле talker_dio_logger: запрос, ответ, время, код и безопасные подробности.
+// Здесь мы делаем понятные HTTP-логи: запрос, ответ, время, код и безопасные подробности.
 
 class EshretTalkerOkHttpInterceptor(
     // Это экземпляр логгера, куда будут уходить HTTP-события.

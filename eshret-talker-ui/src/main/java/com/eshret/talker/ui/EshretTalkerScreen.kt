@@ -47,7 +47,7 @@ import java.util.Date
 import java.util.Locale
 
 // Этот файл описывает основной Compose-экран журнала библиотеки eshret_talker.
-// Здесь мы показываем цветные карточки логов, поиск, фильтрацию и удобное чтение событий в стиле talker_flutter.
+// Здесь мы показываем цветные карточки логов, поиск, фильтрацию и удобное чтение событий.
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

@@ -142,7 +142,7 @@ class EshretTalker(
         log(level = EshretTalkerLevel.HTTP_RESPONSE, message = message, tag = "HTTP", details = details)
     }
 
-    // Это helper для обработки исключения в стиле talker.handle.
+    // Это helper для краткой обработки исключения через единый вызов.
     fun handle(
         throwable: Throwable,
         message: String,
@@ -167,4 +167,3 @@ private fun Throwable.toStackTraceString(): String {
     printer.flush()
     return writer.toString()
 }
-

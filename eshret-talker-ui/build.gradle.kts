@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 // Этот файл описывает Gradle-конфигурацию ui-модуля библиотеки eshret_talker.
 // Здесь мы подключаем Compose и зависимости, нужные для экрана журнала и bottom sheet.
 
@@ -25,8 +27,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
@@ -41,4 +46,3 @@ dependencies {
 
     debugImplementation(libs.compose.ui.tooling)
 }
-

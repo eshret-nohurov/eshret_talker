@@ -8,7 +8,7 @@ import androidx.compose.ui.Modifier
 import com.eshret.talker.core.EshretTalker
 
 // Этот файл описывает bottom sheet библиотеки eshret_talker.
-// Здесь мы упаковываем основной экран логов в удобный модальный формат, похожий на talker_flutter.
+// Здесь мы упаковываем основной экран логов в удобный модальный формат.
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,4 +30,3 @@ fun EshretTalkerBottomSheet(
         )
     }
 }
-

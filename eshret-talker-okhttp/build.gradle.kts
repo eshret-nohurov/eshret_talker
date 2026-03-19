@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 // Этот файл описывает Gradle-конфигурацию okhttp-модуля библиотеки eshret_talker.
 // Здесь мы подключаем OkHttp и core-модуль для красивого логирования HTTP-запросов и ответов.
 
@@ -20,8 +22,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
@@ -29,4 +34,3 @@ dependencies {
     api(project(":eshret-talker-core"))
     implementation(libs.okhttp)
 }
-
