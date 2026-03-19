@@ -1,33 +1,42 @@
 package com.eshret.talker.okhttp
 
 import com.eshret.talker.core.EshretTalker
+import com.eshret.talker.core.EshretTalkerLevel
 import java.io.IOException
 import java.util.Locale
 import okhttp3.Headers
 import okhttp3.Interceptor
 import okhttp3.MediaType
+import okhttp3.Request
 import okhttp3.Response
 
 // Этот файл описывает OkHttp-interceptor библиотеки eshret_talker.
-// Здесь мы делаем понятные HTTP-логи: запрос, ответ, время, код и безопасные подробности.
+// Здесь мы делаем понятные HTTP-логи: запрос, ответ, время, код и безопасные подробности с настраиваемыми флагами.
 
 class EshretTalkerOkHttpInterceptor(
     // Это экземпляр логгера, куда будут уходить HTTP-события.
     private val talker: EshretTalker,
-    // Это лимит размера preview body для удобного чтения.
-    private val bodyPreviewLimit: Long = 2_048L,
-    // Это список чувствительных header, которые надо маскировать.
-    private val redactHeaders: Set<String> = setOf(
-        "authorization",
-        "cookie",
-        "set-cookie",
-        "x-api-key",
-        "x-access-token",
+    // Это набор настроек сетевого логгера.
+    private val settings: EshretTalkerOkHttpLoggerSettings = EshretTalkerOkHttpLoggerSettings(
+        hiddenHeaders = setOf(
+            "authorization",
+            "cookie",
+            "set-cookie",
+            "x-api-key",
+            "x-access-token",
+        ),
     ),
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
+        // Это ранний пропуск, если сетевой логгер отключён.
+        if (!talker.isEnabled || !settings.enabled) {
+            return chain.proceed(chain.request())
+        }
+
         // Это исходный запрос из цепочки OkHttp.
         val request = chain.request()
+        // Это проверка, надо ли логировать конкретный запрос.
+        val shouldLogRequest = settings.requestFilter?.invoke(request) ?: true
         // Это время начала выполнения запроса.
         val startedAtNanos = System.nanoTime()
         // Это короткое имя метода запроса.
@@ -44,16 +53,80 @@ class EshretTalkerOkHttpInterceptor(
         }
 
         // Это подробности исходящего запроса.
-        val requestDetails = buildString {
-            appendLine("URL: ${request.url}")
-            appendLine("Method: $method")
+        val requestDetails = request.takeIf { shouldLogRequest }?.let {
+            buildRequestDetails(it)
+        }
+
+        // Это лог исходящего запроса.
+        if (shouldLogRequest && settings.logLevel.allowsRequestLogging()) {
+            talker.httpRequest(
+                message = "--> $method $target",
+                details = requestDetails,
+            )
+        }
+
+        return try {
+            // Это реальное выполнение HTTP-запроса.
+            val response = chain.proceed(request)
+            // Это проверка, надо ли логировать конкретный ответ.
+            val shouldLogResponse = settings.responseFilter?.invoke(response) ?: true
+            // Это длительность запроса в миллисекундах.
+            val tookMs = (System.nanoTime() - startedAtNanos) / 1_000_000
+
+            // Это подробности входящего ответа.
+            val responseDetails = response.takeIf { shouldLogResponse }?.let {
+                buildResponseDetails(it, tookMs)
+            }
+
+            // Это лог входящего ответа.
+            if (shouldLogResponse && settings.logLevel.allowsRequestLogging()) {
+                talker.httpResponse(
+                    message = buildResponseMessage(response = response, method = method, target = target, tookMs = tookMs),
+                    details = responseDetails,
+                )
+            }
+            response
+        } catch (exception: IOException) {
+            // Это проверка, надо ли логировать конкретную ошибку.
+            val shouldLogError = settings.errorFilter?.invoke(request, exception) ?: true
+            // Это длительность до сетевой ошибки.
+            val tookMs = (System.nanoTime() - startedAtNanos) / 1_000_000
+
+            // Это лог сетевого сбоя.
+            if (shouldLogError && settings.logLevel.allowsErrorLogging()) {
+                talker.error(
+                    message = "<-- HTTP FAILED $method $target (${tookMs} ms)",
+                    tag = "HTTP",
+                    details = buildErrorDetails(
+                        request = request,
+                        exception = exception,
+                        tookMs = tookMs,
+                    ),
+                    throwable = exception,
+                )
+            }
+            throw exception
+        }
+    }
+
+    // Это сборка подробностей исходящего запроса по текущим флагам.
+    private fun buildRequestDetails(request: Request): String = buildString {
+        appendLine("URL: ${request.url}")
+        appendLine("Method: ${request.method}")
+        if (settings.printRequestExtra) {
+            appendLine("Extra:")
+            appendLine(request.extraDump())
+        }
+        if (settings.printRequestHeaders) {
             appendLine("Headers:")
-            appendLine(request.headers.redactedDump(redactHeaders))
+            appendLine(request.headers.redactedDump(settings.hiddenHeaders))
+        }
+        if (settings.printRequestData) {
             request.body?.let { body ->
                 readRequestBodyPreview(
                     contentType = body.contentType(),
                     body = body,
-                    limit = bodyPreviewLimit,
+                    limit = settings.requestBodyPreviewLimit,
                 )
                     ?.takeIf { it.isNotBlank() }
                     ?.let { preview ->
@@ -62,29 +135,68 @@ class EshretTalkerOkHttpInterceptor(
                     }
             }
         }
+    }
 
-        // Это лог исходящего запроса.
-        talker.httpRequest(
-            message = "--> $method $target",
-            details = requestDetails,
-        )
-
-        return try {
-            // Это реальное выполнение HTTP-запроса.
-            val response = chain.proceed(request)
-            // Это длительность запроса в миллисекундах.
-            val tookMs = (System.nanoTime() - startedAtNanos) / 1_000_000
-
-            // Это подробности входящего ответа.
-            val responseDetails = buildString {
-                appendLine("URL: ${response.request.url}")
-                appendLine("Status: ${response.code} ${response.message}")
-                appendLine("Duration: ${tookMs} ms")
-                appendLine("Headers:")
-                appendLine(response.headers.redactedDump(redactHeaders))
-                readResponseBodyPreview(
+    // Это сборка подробностей входящего ответа по текущим флагам.
+    private fun buildResponseDetails(
+        response: Response,
+        tookMs: Long,
+    ): String = buildString {
+        appendLine("URL: ${response.request.url}")
+        append("Status: ${response.code}")
+        if (settings.printResponseMessage) {
+            append(" ${response.message}")
+        }
+        appendLine()
+        if (settings.printResponseTime) {
+            appendLine("Duration: ${tookMs} ms")
+        }
+        if (settings.printResponseRedirects) {
+            appendLine("Redirect: ${response.isRedirect}")
+        }
+        if (settings.printResponseHeaders) {
+            appendLine("Headers:")
+            appendLine(response.headers.redactedDump(settings.hiddenHeaders))
+        }
+        if (settings.printResponseData) {
+            val bodyPreview = runCatching {
+                settings.responseDataConverter?.invoke(response)
+            }.getOrNull()
+                ?: readResponseBodyPreview(
                     response = response,
-                    limit = bodyPreviewLimit,
+                    limit = settings.responseBodyPreviewLimit,
+                )
+            bodyPreview
+                ?.takeIf { it.isNotBlank() }
+                ?.let { preview ->
+                    appendLine("Body:")
+                    append(preview)
+                }
+        }
+    }
+
+    // Это сборка подробностей по сетевой ошибке.
+    private fun buildErrorDetails(
+        request: Request,
+        exception: IOException,
+        tookMs: Long,
+    ): String = buildString {
+        appendLine("URL: ${request.url}")
+        appendLine("Method: ${request.method}")
+        appendLine("Duration: ${tookMs} ms")
+        if (settings.printErrorMessage) {
+            appendLine("Message: ${exception.message.orEmpty()}")
+        }
+        if (settings.printErrorHeaders) {
+            appendLine("Headers:")
+            appendLine(request.headers.redactedDump(settings.hiddenHeaders))
+        }
+        if (settings.printErrorData) {
+            request.body?.let { body ->
+                readRequestBodyPreview(
+                    contentType = body.contentType(),
+                    body = body,
+                    limit = settings.requestBodyPreviewLimit,
                 )
                     ?.takeIf { it.isNotBlank() }
                     ?.let { preview ->
@@ -92,25 +204,22 @@ class EshretTalkerOkHttpInterceptor(
                         append(preview)
                     }
             }
+        }
+    }
 
-            // Это лог входящего ответа.
-            talker.httpResponse(
-                message = "<-- ${response.code} $method $target (${tookMs} ms)",
-                details = responseDetails,
-            )
-            response
-        } catch (exception: IOException) {
-            // Это длительность до сетевой ошибки.
-            val tookMs = (System.nanoTime() - startedAtNanos) / 1_000_000
-
-            // Это лог сетевого сбоя.
-            talker.error(
-                message = "<-- HTTP FAILED $method $target (${tookMs} ms)",
-                tag = "HTTP",
-                details = exception.message,
-                throwable = exception,
-            )
-            throw exception
+    // Это сборка короткой строки заголовка для ответа.
+    private fun buildResponseMessage(
+        response: Response,
+        method: String,
+        target: String,
+        tookMs: Long,
+    ): String = buildString {
+        append("<-- ${response.code} $method $target")
+        if (settings.printResponseTime) {
+            append(" (${tookMs} ms)")
+        }
+        if (settings.printResponseMessage && response.message.isNotBlank()) {
+            append(" ${response.message}")
         }
     }
 }
@@ -135,6 +244,15 @@ private fun Headers.redactedDump(redactHeaders: Set<String>): String = buildStri
             }
         }
     }
+}
+
+// Это helper краткой выгрузки дополнительных сведений по запросу.
+private fun Request.extraDump(): String = buildString {
+    appendLine("HTTPS: ${url.isHttps}")
+    body?.let { body ->
+        appendLine("Content-Type: ${body.contentType()}")
+        append("Content-Length: ${runCatching { body.contentLength() }.getOrDefault(-1L)}")
+    } ?: append("Content-Length: 0")
 }
 
 // Это helper чтения preview request body для текстовых payload.
@@ -169,4 +287,32 @@ private fun MediaType?.isProbablyTextual(): Boolean {
         subtypeValue.contains("xml", ignoreCase = true) ||
         subtypeValue.contains("html", ignoreCase = true) ||
         subtypeValue.contains("x-www-form-urlencoded", ignoreCase = true)
+}
+
+// Это helper проверки, можно ли при текущем уровне логировать обычные HTTP-события.
+private fun EshretTalkerLevel.allowsRequestLogging(): Boolean = when (this) {
+    EshretTalkerLevel.VERBOSE,
+    EshretTalkerLevel.DEBUG -> true
+
+    EshretTalkerLevel.INFO,
+    EshretTalkerLevel.SUCCESS,
+    EshretTalkerLevel.WARNING,
+    EshretTalkerLevel.ERROR,
+    EshretTalkerLevel.CRITICAL,
+    EshretTalkerLevel.HTTP_REQUEST,
+    EshretTalkerLevel.HTTP_RESPONSE -> false
+}
+
+// Это helper проверки, можно ли при текущем уровне логировать HTTP-ошибки.
+private fun EshretTalkerLevel.allowsErrorLogging(): Boolean = when (this) {
+    EshretTalkerLevel.VERBOSE,
+    EshretTalkerLevel.DEBUG,
+    EshretTalkerLevel.INFO,
+    EshretTalkerLevel.SUCCESS,
+    EshretTalkerLevel.WARNING,
+    EshretTalkerLevel.ERROR,
+    EshretTalkerLevel.CRITICAL -> true
+
+    EshretTalkerLevel.HTTP_REQUEST,
+    EshretTalkerLevel.HTTP_RESPONSE -> true
 }

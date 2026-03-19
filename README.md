@@ -186,6 +186,7 @@ Interceptor логирует:
 ```kotlin
 val talker = EshretTalker(
     config = EshretTalkerConfig(
+        enabled = true,
         maxEntries = 600,
         logcatEnabled = true,
         logcatTag = "eshret_talker",
@@ -203,6 +204,30 @@ val analyticsSink = EshretTalkerSink { entry ->
 val talker = EshretTalker(
     extraSinks = listOf(analyticsSink),
 )
+```
+
+Глобально отключить логирование можно через `enabled = false` в `EshretTalkerConfig`.
+
+Тонкая настройка HTTP-логирования:
+
+```kotlin
+val httpLoggerSettings = EshretTalkerOkHttpLoggerSettings(
+    enabled = true,
+    logLevel = EshretTalkerLevel.DEBUG,
+    printRequestHeaders = true,
+    printResponseHeaders = true,
+    printResponseTime = true,
+    hiddenHeaders = setOf("authorization", "cookie"),
+)
+
+val client = OkHttpClient.Builder()
+    .addInterceptor(
+        EshretTalkerOkHttpInterceptor(
+            talker = talker,
+            settings = httpLoggerSettings,
+        ),
+    )
+    .build()
 ```
 
 ## Уровни логов

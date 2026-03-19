@@ -26,9 +26,15 @@ class EshretTalker(
     // Это публичный поток логов для экрана журнала.
     val logs: StateFlow<List<EshretTalkerLogEntry>> = _logs.asStateFlow()
 
+    // Это публичный флаг, включён ли логгер сейчас.
+    val isEnabled: Boolean get() = config.enabled
+
+    // Это публичный флаг, включён ли вывод в Logcat.
+    val isLogcatEnabled: Boolean get() = config.enabled && config.logcatEnabled
+
     // Это полный набор sink-приёмников, включая системный Logcat.
     private val sinks: List<EshretTalkerSink> = buildList {
-        if (config.logcatEnabled) {
+        if (config.enabled && config.logcatEnabled) {
             add(LogcatEshretTalkerSink(baseTag = config.logcatTag))
         }
         addAll(extraSinks)
@@ -47,6 +53,9 @@ class EshretTalker(
         details: String? = null,
         throwable: Throwable? = null,
     ) {
+        // Это ранний выход, если логгер глобально отключён.
+        if (!config.enabled) return
+
         // Это подготовка stack trace в строку.
         val stackTrace = throwable?.toStackTraceString()
         // Это краткая строка ошибки для UI и консоли.

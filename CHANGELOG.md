@@ -14,6 +14,8 @@
 - инструкция по релизному процессу в `RELEASING.md`
 - инструкция по защите ветки и прав доступа в `REPOSITORY_PROTECTION.md`
 - `CODEOWNERS` для модели с обязательным review владельца
+- флаг `enabled` в `EshretTalkerConfig` для глобального включения/отключения логгера
+- `EshretTalkerOkHttpLoggerSettings` для тонкой настройки HTTP-логов, фильтров и маскирования headers
 
 ### Изменено
 
