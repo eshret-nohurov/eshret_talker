@@ -1,0 +1,4 @@
+<!-- Этот файл описывает AndroidManifest okhttp-модуля библиотеки eshret_talker.
+     Здесь модуль не объявляет компонентов и содержит только interceptor для HTTP-логов. -->
+<manifest />
+
