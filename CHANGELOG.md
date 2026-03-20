@@ -16,6 +16,8 @@
 - `CODEOWNERS` для модели с обязательным review владельца
 - флаг `enabled` в `EshretTalkerConfig` для глобального включения/отключения логгера
 - `EshretTalkerOkHttpLoggerSettings` для тонкой настройки HTTP-логов, фильтров и маскирования headers
+- полноэкранный `EshretTalkerBottomSheet`
+- action sheet с очисткой истории, копированием логов и системным шарингом `.txt` файла
 
 ### Изменено
 

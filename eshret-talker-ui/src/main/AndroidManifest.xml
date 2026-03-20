@@ -1,4 +1,15 @@
 <!-- Этот файл описывает AndroidManifest ui-модуля библиотеки eshret_talker.
-     Здесь модуль не объявляет компонентов и содержит только Compose UI библиотеки. -->
-<manifest />
-
+     Здесь объявлен FileProvider для безопасного системного шаринга экспортированных логов. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.eshret_talker.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/eshret_talker_file_paths" />
+        </provider>
+    </application>
+</manifest>

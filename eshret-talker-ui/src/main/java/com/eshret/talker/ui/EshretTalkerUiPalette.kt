@@ -57,4 +57,4 @@ internal val EshretTalkerCardBorderColor = Color(0xFF24242D)
 internal val EshretTalkerTextPrimary = Color(0xFFF5F5F7)
 internal val EshretTalkerTextSecondary = Color(0xFFAAAAAF)
 internal val EshretTalkerToolbarColor = Color(0xFF15151C)
-
+internal val EshretTalkerSheetScrimColor = Color(0xFF000000).copy(alpha = 0.72f)
