@@ -58,6 +58,8 @@ fun EshretTalkerScreen(
     talker: EshretTalker,
     // Это внешний модификатор экрана.
     modifier: Modifier = Modifier,
+    // Это флаг учёта верхней системной панели для полноэкранного sheet.
+    respectStatusBarInsets: Boolean = false,
 ) {
     // Это текущий список записей из логгера.
     val entries by talker.logs.collectAsState()
@@ -97,6 +99,7 @@ fun EshretTalkerScreen(
                 levels = levels,
                 query = query,
                 selectedLevel = selectedLevel,
+                respectStatusBarInsets = respectStatusBarInsets,
                 onQueryChange = { query = it },
                 onLevelClick = { level ->
                     selectedLevel = if (selectedLevel == level) null else level
@@ -108,8 +111,8 @@ fun EshretTalkerScreen(
                 // Это пустое состояние, если логов пока нет или фильтр ничего не нашёл.
                 Box(
                     modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+                        .fillMaxWidth()
+                        .weight(1f),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -182,6 +185,7 @@ private fun EshretTalkerToolbar(
     levels: List<EshretTalkerLevel>,
     query: String,
     selectedLevel: EshretTalkerLevel?,
+    respectStatusBarInsets: Boolean,
     onQueryChange: (String) -> Unit,
     onLevelClick: (EshretTalkerLevel) -> Unit,
     onActionsClick: () -> Unit,
@@ -191,6 +195,13 @@ private fun EshretTalkerToolbar(
         modifier = Modifier
             .fillMaxWidth()
             .background(EshretTalkerToolbarColor)
+            .then(
+                if (respectStatusBarInsets) {
+                    Modifier.statusBarsPadding()
+                } else {
+                    Modifier
+                },
+            )
             .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
     ) {
         Row(
@@ -380,6 +391,10 @@ private fun EshretTalkerLogCard(
     val formatter = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()) }
     // Это локальный флаг разворота подробностей записи.
     var expanded by remember(entry.id) { mutableStateOf(false) }
+    // Это manager системного буфера обмена для копирования одной записи.
+    val clipboardManager = LocalClipboardManager.current
+    // Это context для короткого toast после копирования.
+    val context = LocalContext.current
 
     Surface(
         modifier = Modifier
@@ -412,6 +427,7 @@ private fun EshretTalkerLogCard(
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
                             text = "${entry.level.emoji} ${entry.level.title}",
@@ -419,11 +435,30 @@ private fun EshretTalkerLogCard(
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                         )
-                        Text(
-                            text = formatter.format(Date(entry.timestampMillis)),
-                            color = EshretTalkerTextSecondary,
-                            style = MaterialTheme.typography.labelSmall,
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                text = formatter.format(Date(entry.timestampMillis)),
+                                color = EshretTalkerTextSecondary,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                            IconButton(
+                                onClick = {
+                                    clipboardManager.setText(AnnotatedString(entry.toShareBlockText()))
+                                    showTalkerToast(context, "Лог скопирован")
+                                },
+                                modifier = Modifier.size(28.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.ContentCopy,
+                                    contentDescription = "Скопировать лог",
+                                    tint = EshretTalkerTextSecondary,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
                     }
                     if (entry.tag.isNotBlank()) {
                         Text(

@@ -63,6 +63,7 @@ fun EshretTalkerBottomSheet(
             EshretTalkerScreen(
                 talker = talker,
                 modifier = Modifier.fillMaxSize(),
+                respectStatusBarInsets = true,
             )
         }
     }

@@ -19,7 +19,7 @@ private val exportFileNameFormatter = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Lo
 // Это сборка полного текстового представления всех логов для копирования и шаринга.
 internal fun List<EshretTalkerLogEntry>.toShareText(): String = buildString {
     this@toShareText.forEachIndexed { index, entry ->
-        append(entry.toShareBlock())
+        append(entry.toShareBlockText())
         if (index != this@toShareText.lastIndex) {
             appendLine()
             appendLine()
@@ -53,8 +53,8 @@ internal fun shareLogsAsFile(
     context.startActivity(chooserIntent)
 }
 
-// Это построение текста одной записи журнала для экспорта.
-private fun EshretTalkerLogEntry.toShareBlock(): String = buildString {
+// Это построение текста одной записи журнала для экспорта или копирования.
+internal fun EshretTalkerLogEntry.toShareBlockText(): String = buildString {
     appendLine("id: $id")
     appendLine("time: ${exportLogTimeFormatter.format(Date(timestampMillis))}")
     appendLine("level: ${level.title}")
