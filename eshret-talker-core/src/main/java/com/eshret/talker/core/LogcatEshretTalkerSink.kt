@@ -59,6 +59,7 @@ class LogcatEshretTalkerSink(
             EshretTalkerLevel.VERBOSE -> Log.v(tag, message)
             EshretTalkerLevel.DEBUG -> Log.d(tag, message)
             EshretTalkerLevel.INFO -> Log.i(tag, message)
+            EshretTalkerLevel.NAVIGATION -> Log.i(tag, message)
             EshretTalkerLevel.SUCCESS -> Log.i(tag, message)
             EshretTalkerLevel.WARNING -> Log.w(tag, message)
             EshretTalkerLevel.ERROR -> Log.e(tag, message)
@@ -68,4 +69,3 @@ class LogcatEshretTalkerSink(
         }
     }
 }
-

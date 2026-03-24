@@ -265,7 +265,7 @@ private fun readRequestBodyPreview(
 
     val buffer = okio.Buffer()
     body.writeTo(buffer)
-    return buffer.readUtf8().take(limit.toInt())
+    return buffer.readUtf8()
 }
 
 // Это helper чтения preview response body без разрушения основного потока.
@@ -275,7 +275,7 @@ private fun readResponseBodyPreview(
 ): String? {
     val contentType = response.body?.contentType()
     if (!contentType.isProbablyTextual()) return "(binary body omitted)"
-    return response.peekBody(byteCount = limit).string()
+    return response.peekBody(byteCount = Long.MAX_VALUE).string()
 }
 
 // Это helper проверки, можно ли безопасно показать body как текст.
@@ -295,6 +295,7 @@ private fun EshretTalkerLevel.allowsRequestLogging(): Boolean = when (this) {
     EshretTalkerLevel.DEBUG -> true
 
     EshretTalkerLevel.INFO,
+    EshretTalkerLevel.NAVIGATION,
     EshretTalkerLevel.SUCCESS,
     EshretTalkerLevel.WARNING,
     EshretTalkerLevel.ERROR,
@@ -308,6 +309,7 @@ private fun EshretTalkerLevel.allowsErrorLogging(): Boolean = when (this) {
     EshretTalkerLevel.VERBOSE,
     EshretTalkerLevel.DEBUG,
     EshretTalkerLevel.INFO,
+    EshretTalkerLevel.NAVIGATION,
     EshretTalkerLevel.SUCCESS,
     EshretTalkerLevel.WARNING,
     EshretTalkerLevel.ERROR,

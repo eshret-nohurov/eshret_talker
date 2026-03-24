@@ -99,6 +99,11 @@ class EshretTalker(
         log(level = EshretTalkerLevel.INFO, message = message, tag = tag, details = details)
     }
 
+    // Это лог навигации между экранами и маршрутами.
+    fun navigation(message: String, details: String? = null) {
+        log(level = EshretTalkerLevel.NAVIGATION, message = message, tag = "NAVIGATION", details = details)
+    }
+
     // Это лог успешного действия.
     fun success(message: String, tag: String = "APP", details: String? = null) {
         log(level = EshretTalkerLevel.SUCCESS, message = message, tag = tag, details = details)

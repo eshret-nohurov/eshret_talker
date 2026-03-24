@@ -18,6 +18,10 @@
 - `EshretTalkerOkHttpLoggerSettings` для тонкой настройки HTTP-логов, фильтров и маскирования headers
 - полноэкранный `EshretTalkerBottomSheet`
 - action sheet с очисткой истории, копированием логов и системным шарингом `.txt` файла
+- уровень логов `NAVIGATION` и API `talker.navigation(...)`
+- фильтрация видимости логов по типам на экране журнала
+- переключение порядка логов через `SwapVert`
+- полноэкранный viewer для `body` с раскрывающимися JSON-узлами
 
 ### Изменено
 
@@ -25,3 +29,4 @@
 - документация переведена на русский язык
 - добавлены POM-метаданные для артефактов (`group`, `version`, `scm`, `license`, `developer`)
 - `kotlinOptions.jvmTarget` переведен на современный `compilerOptions` DSL
+- HTTP-interceptor теперь сохраняет полный текстовый body (без preview-обрезки)

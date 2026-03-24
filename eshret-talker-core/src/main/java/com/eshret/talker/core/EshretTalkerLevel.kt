@@ -18,6 +18,9 @@ enum class EshretTalkerLevel(
     // Это обычное информационное сообщение.
     INFO(title = "INFO", emoji = "ℹ️"),
 
+    // Это событие навигации по экранам и маршрутам.
+    NAVIGATION(title = "NAVIGATION", emoji = "🧭"),
+
     // Это успешное завершение действия.
     SUCCESS(title = "SUCCESS", emoji = "✅"),
 
@@ -36,4 +39,3 @@ enum class EshretTalkerLevel(
     // Это входящий HTTP-ответ.
     HTTP_RESPONSE(title = "HTTP IN", emoji = "📥"),
 }
-

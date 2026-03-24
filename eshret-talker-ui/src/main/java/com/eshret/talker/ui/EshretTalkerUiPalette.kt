@@ -26,6 +26,10 @@ internal fun EshretTalkerLevel.uiStyle(): EshretTalkerLevelStyle = when (this) {
         accent = Color(0xFF64B5F6),
         container = Color(0xFF10293D),
     )
+    EshretTalkerLevel.NAVIGATION -> EshretTalkerLevelStyle(
+        accent = Color(0xFFFFD54F),
+        container = Color(0xFF33280E),
+    )
     EshretTalkerLevel.SUCCESS -> EshretTalkerLevelStyle(
         accent = Color(0xFF66BB6A),
         container = Color(0xFF162E19),

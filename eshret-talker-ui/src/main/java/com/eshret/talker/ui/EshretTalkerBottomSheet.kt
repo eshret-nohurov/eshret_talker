@@ -1,29 +1,28 @@
 package com.eshret.talker.ui
 
 import android.app.Activity
+import android.graphics.Color as AndroidColor
+import android.graphics.drawable.ColorDrawable
+import android.os.Build
+import android.view.WindowManager
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import com.eshret.talker.core.EshretTalker
@@ -31,7 +30,6 @@ import com.eshret.talker.core.EshretTalker
 // Этот файл описывает полноэкранный bottom sheet библиотеки eshret_talker.
 // Здесь журнал сразу открывается на весь экран и синхронизирует системные бары с окном приложения.
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EshretTalkerBottomSheet(
     // Это экземпляр логгера, который нужно показать.
@@ -39,52 +37,32 @@ fun EshretTalkerBottomSheet(
     // Это callback закрытия sheet.
     onDismiss: () -> Unit,
 ) {
-    // Это состояние full-screen bottom sheet без промежуточного partially expanded режима.
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-    )
+    // Это верхний отступ под системную статус-панель для самого контейнера sheet.
+    val topSystemBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-    ModalBottomSheet(
+    Dialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxSize(),
-        sheetState = sheetState,
-        sheetMaxWidth = Dp.Unspecified,
-        containerColor = EshretTalkerScreenColor,
-        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
-        scrimColor = EshretTalkerSheetScrimColor,
-        dragHandle = {
-            EshretTalkerBottomSheetDragHandle()
-        },
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
     ) {
         SyncBottomSheetSystemBars()
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(EshretTalkerSheetScrimColor),
         ) {
             EshretTalkerScreen(
                 talker = talker,
-                modifier = Modifier.fillMaxSize(),
-                respectStatusBarInsets = true,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = topSystemBarPadding),
+                respectStatusBarInsets = false,
             )
         }
-    }
-}
-
-@Composable
-private fun EshretTalkerBottomSheetDragHandle() {
-    // Это короткая ручка в верхней части полноэкранного sheet.
-    Box(
-        modifier = Modifier
-            .padding(top = 10.dp, bottom = 4.dp)
-            .fillMaxWidth(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(100.dp))
-                .background(EshretTalkerTextSecondary.copy(alpha = 0.24f))
-                .height(4.dp)
-                .fillMaxWidth(0.18f),
-        )
     }
 }
 
@@ -109,6 +87,15 @@ private fun SyncBottomSheetSystemBars() {
             // Это сохранение исходных цветов sheet-окна на время показа.
             val previousStatusBarColor = sheetWindow.statusBarColor
             val previousNavigationBarColor = sheetWindow.navigationBarColor
+            val previousWindowBackground = sheetWindow.decorView.background
+            val previousLayoutWidth = sheetWindow.attributes.width
+            val previousLayoutHeight = sheetWindow.attributes.height
+            val previousNavigationBarContrastEnforced =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    sheetWindow.isNavigationBarContrastEnforced
+                } else {
+                    null
+                }
             // Это контроллер системных баров для sheet-окна.
             val sheetInsetsController = WindowCompat.getInsetsController(sheetWindow, view)
             // Это контроллер системных баров основного окна.
@@ -121,6 +108,18 @@ private fun SyncBottomSheetSystemBars() {
             sheetWindow.statusBarColor = Color.Transparent.toArgb()
             // Это прозрачный фон нижней системной панели поверх bottom sheet.
             sheetWindow.navigationBarColor = Color.Transparent.toArgb()
+            // Это прозрачный фон самого dialog-окна, чтобы системные панели не подхватывали подложку окна.
+            sheetWindow.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
+            sheetWindow.decorView.setBackgroundColor(AndroidColor.TRANSPARENT)
+            sheetWindow.setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+            )
+            // Это включение edge-to-edge у dialog-окна sheet, чтобы контент мог просвечивать под навигационной панелью.
+            WindowCompat.setDecorFitsSystemWindows(sheetWindow, false)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                sheetWindow.isNavigationBarContrastEnforced = false
+            }
             // Это перенос текущего режима иконок системных баров из activity.
             sheetInsetsController.isAppearanceLightStatusBars = activityInsetsController.isAppearanceLightStatusBars
             sheetInsetsController.isAppearanceLightNavigationBars = activityInsetsController.isAppearanceLightNavigationBars
@@ -128,6 +127,16 @@ private fun SyncBottomSheetSystemBars() {
             onDispose {
                 sheetWindow.statusBarColor = previousStatusBarColor
                 sheetWindow.navigationBarColor = previousNavigationBarColor
+                sheetWindow.setBackgroundDrawable(
+                    (previousWindowBackground as? ColorDrawable) ?: ColorDrawable(AndroidColor.TRANSPARENT),
+                )
+                sheetWindow.decorView.background = previousWindowBackground
+                sheetWindow.setLayout(previousLayoutWidth, previousLayoutHeight)
+                WindowCompat.setDecorFitsSystemWindows(sheetWindow, true)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    sheetWindow.isNavigationBarContrastEnforced =
+                        previousNavigationBarContrastEnforced ?: true
+                }
                 sheetInsetsController.isAppearanceLightStatusBars = previousLightStatusBars
                 sheetInsetsController.isAppearanceLightNavigationBars = previousLightNavigationBars
             }
