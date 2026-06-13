@@ -43,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clipToBounds
@@ -64,6 +65,9 @@ import com.eshret.talker.core.EshretTalker
 import com.eshret.talker.core.EshretTalkerLevel
 import com.eshret.talker.core.EshretTalkerLogEntry
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -103,8 +107,9 @@ fun EshretTalkerScreen(
     val navigationBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     // Это список уровней для горизонтального скролла.
     val levels = remember { EshretTalkerLevel.entries.toList() }
-    // Это полный текст всего журнала для копирования и шаринга.
-    val shareText = remember(entries) { entries.toShareText() }
+    // Это scope для фоновой подготовки экспорта: склейка/запись журнала — тяжёлая операция,
+    // её НЕЛЬЗЯ делать ни в композиции, ни на main thread (инцидент: OOM ~95 МБ на toShareText).
+    val coroutineScope = rememberCoroutineScope()
     // Это состояние списка логов.
     val listState = rememberLazyListState()
     // Это текущая измеренная высота сворачиваемой панели фильтров и поиска.
@@ -288,24 +293,32 @@ fun EshretTalkerScreen(
                     if (entries.isEmpty()) {
                         showTalkerToast(context, "Журнал пуст")
                     } else {
-                        clipboardManager.setText(AnnotatedString(shareText))
-                        showActionsSheet = false
-                        showTalkerToast(context, "Все логи скопированы")
+                        // Это сборка текста по клику и вне main: для клипборда строка неизбежна,
+                        // но строим её в фоне, а не в композиции на каждый новый лог.
+                        coroutineScope.launch {
+                            val shareText = withContext(Dispatchers.Default) { entries.toShareText() }
+                            clipboardManager.setText(AnnotatedString(shareText))
+                            showActionsSheet = false
+                            showTalkerToast(context, "Все логи скопированы")
+                        }
                     }
                 },
                 onShareLogFile = {
                     if (entries.isEmpty()) {
                         showTalkerToast(context, "Журнал пуст")
                     } else {
-                        runCatching {
-                            shareLogsAsFile(
-                                context = context,
-                                logsText = shareText,
-                            )
-                        }.onSuccess {
-                            showActionsSheet = false
-                        }.onFailure {
-                            showTalkerToast(context, "Не удалось открыть системный share")
+                        coroutineScope.launch {
+                            runCatching {
+                                // Это потоковая запись файла на IO без склейки журнала в одну строку.
+                                val exportFile = withContext(Dispatchers.IO) {
+                                    writeLogsExportFile(context = context, entries = entries)
+                                }
+                                shareLogsAsFile(context = context, exportFile = exportFile)
+                            }.onSuccess {
+                                showActionsSheet = false
+                            }.onFailure {
+                                showTalkerToast(context, "Не удалось открыть системный share")
+                            }
                         }
                     }
                 }

@@ -52,17 +52,15 @@ class EshretTalkerOkHttpInterceptor(
             }
         }
 
-        // Это подробности исходящего запроса.
-        val requestDetails = request.takeIf { shouldLogRequest }?.let {
-            buildRequestDetails(it)
-        }
-
-        // Это лог исходящего запроса.
+        // Это лог исходящего запроса. Предохранитель: сбой сборки деталей или самого логирования
+        // (инцидент 2026-06-12: OOM на склейке лог-строки) не должен ломать сетевой вызов.
         if (shouldLogRequest && settings.logLevel.allowsRequestLogging()) {
-            talker.httpRequest(
-                message = "--> $method $target",
-                details = requestDetails,
-            )
+            runCatching {
+                talker.httpRequest(
+                    message = "--> $method $target",
+                    details = buildRequestDetails(request),
+                )
+            }
         }
 
         return try {
@@ -73,17 +71,22 @@ class EshretTalkerOkHttpInterceptor(
             // Это длительность запроса в миллисекундах.
             val tookMs = (System.nanoTime() - startedAtNanos) / 1_000_000
 
-            // Это подробности входящего ответа.
-            val responseDetails = response.takeIf { shouldLogResponse }?.let {
-                buildResponseDetails(it, tookMs)
-            }
-
-            // Это лог входящего ответа.
-            if (shouldLogResponse && settings.logLevel.allowsRequestLogging()) {
-                talker.httpResponse(
-                    message = buildResponseMessage(response = response, method = method, target = target, tookMs = tookMs),
-                    details = responseDetails,
-                )
+            // Это лог входящего ответа, РАЗДЕЛЁННЫЙ по исходу:
+            //  - успешный (2xx) → httpResponse (обычный лог, гейтится уровнем как запрос);
+            //  - неуспешный (4xx/5xx) → error (красный, гейтится как ошибки — виден и на INFO+).
+            // Предохранитель: сбой логирования не должен терять уже полученный ответ.
+            if (shouldLogResponse) {
+                runCatching {
+                    val responseDetails = buildResponseDetails(response, tookMs)
+                    val message = buildResponseMessage(response = response, method = method, target = target, tookMs = tookMs)
+                    if (response.isSuccessful) {
+                        if (settings.logLevel.allowsRequestLogging()) {
+                            talker.httpResponse(message = message, details = responseDetails)
+                        }
+                    } else if (settings.logLevel.allowsErrorLogging()) {
+                        talker.error(message = message, tag = "HTTP", details = responseDetails)
+                    }
+                }
             }
             response
         } catch (exception: IOException) {
@@ -92,18 +95,22 @@ class EshretTalkerOkHttpInterceptor(
             // Это длительность до сетевой ошибки.
             val tookMs = (System.nanoTime() - startedAtNanos) / 1_000_000
 
-            // Это лог сетевого сбоя.
+            // Это лог сетевого сбоя. Предохранитель: именно на этом пути случился OOM-краш
+            // 2026-06-12 (сборка деталей с телом запроса в сетевом потоке) — сбой логирования
+            // не должен подменять исходную сетевую ошибку.
             if (shouldLogError && settings.logLevel.allowsErrorLogging()) {
-                talker.error(
-                    message = "<-- HTTP FAILED $method $target (${tookMs} ms)",
-                    tag = "HTTP",
-                    details = buildErrorDetails(
-                        request = request,
-                        exception = exception,
-                        tookMs = tookMs,
-                    ),
-                    throwable = exception,
-                )
+                runCatching {
+                    talker.error(
+                        message = "<-- HTTP FAILED $method $target (${tookMs} ms)",
+                        tag = "HTTP",
+                        details = buildErrorDetails(
+                            request = request,
+                            exception = exception,
+                            tookMs = tookMs,
+                        ),
+                        throwable = exception,
+                    )
+                }
             }
             throw exception
         }
@@ -256,6 +263,8 @@ private fun Request.extraDump(): String = buildString {
 }
 
 // Это helper чтения preview request body для текстовых payload.
+// Лимит здесь обязателен: без обрезки мегабайтные тела раздувают журнал, а вместе с ним —
+// экспорт/шаринг логов и любые sink-приёмники (инцидент: OOM на склейке журнала с телами по 1.5 МБ).
 private fun readRequestBodyPreview(
     contentType: MediaType?,
     body: okhttp3.RequestBody,
@@ -263,19 +272,30 @@ private fun readRequestBodyPreview(
 ): String? {
     if (!contentType.isProbablyTextual()) return "(binary body omitted)"
 
+    // Защита от нештатных настроек: лимит ниже 1 или выше Int.MAX_VALUE ломал бы чтение/String().
+    val safeLimit = limit.coerceIn(1L, Int.MAX_VALUE.toLong() - 16)
     val buffer = okio.Buffer()
     body.writeTo(buffer)
-    return buffer.readUtf8()
+    if (buffer.size <= safeLimit) return buffer.readUtf8()
+    val totalBytes = buffer.size
+    val preview = buffer.readUtf8(safeLimit)
+    return "$preview\n…(body truncated: shown $safeLimit of $totalBytes bytes)"
 }
 
-// Это helper чтения preview response body без разрушения основного потока.
+// Это helper чтения preview response body без разрушения основного потока (peek + лимит).
 private fun readResponseBodyPreview(
     response: Response,
     limit: Long,
 ): String? {
     val contentType = response.body?.contentType()
     if (!contentType.isProbablyTextual()) return "(binary body omitted)"
-    return response.peekBody(byteCount = Long.MAX_VALUE).string()
+    // Защита от нештатных настроек: лимит ниже 1 или выше Int.MAX_VALUE ломал бы чтение/String().
+    val safeLimit = limit.coerceIn(1L, Int.MAX_VALUE.toLong() - 16)
+    // Читаем safeLimit + 1 байт: лишний байт нужен только чтобы понять, что тело длиннее лимита.
+    val peekedBytes = response.peekBody(byteCount = safeLimit + 1).bytes()
+    if (peekedBytes.size <= safeLimit) return String(peekedBytes, Charsets.UTF_8)
+    val preview = String(peekedBytes, 0, safeLimit.toInt(), Charsets.UTF_8)
+    return "$preview\n…(body truncated: shown $safeLimit bytes)"
 }
 
 // Это helper проверки, можно ли безопасно показать body как текст.

@@ -27,17 +27,33 @@ internal fun List<EshretTalkerLogEntry>.toShareText(): String = buildString {
     }
 }
 
-// Это создание и запуск системного share-intent с текстовым файлом логов.
-internal fun shareLogsAsFile(
+// Это потоковая запись журнала в файл экспорта: пишем по одной записи через buffered writer,
+// НЕ собирая весь журнал в одну строку — иначе при жирных записях склейка падает с OOM
+// (инцидент: попытка аллокации ~95 МБ строки на main thread при шаринге логов).
+internal fun writeLogsExportFile(
     context: Context,
-    logsText: String,
-) {
+    entries: List<EshretTalkerLogEntry>,
+): File {
     val exportDirectory = File(context.cacheDir, "eshret_talker_exports").apply {
         mkdirs()
     }
     val exportFile = File(exportDirectory, buildExportFileName())
-    exportFile.writeText(logsText)
+    exportFile.bufferedWriter().use { writer ->
+        entries.forEachIndexed { index, entry ->
+            writer.write(entry.toShareBlockText())
+            if (index != entries.lastIndex) {
+                writer.write("\n\n")
+            }
+        }
+    }
+    return exportFile
+}
 
+// Это создание и запуск системного share-intent с готовым текстовым файлом логов.
+internal fun shareLogsAsFile(
+    context: Context,
+    exportFile: File,
+) {
     val authority = "${context.packageName}.eshret_talker.fileprovider"
     val fileUri = FileProvider.getUriForFile(context, authority, exportFile)
     val shareIntent = Intent(Intent.ACTION_SEND).apply {

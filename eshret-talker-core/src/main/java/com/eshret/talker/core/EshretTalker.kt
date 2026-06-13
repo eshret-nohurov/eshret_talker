@@ -56,31 +56,41 @@ class EshretTalker(
         // Это ранний выход, если логгер глобально отключён.
         if (!config.enabled) return
 
-        // Это подготовка stack trace в строку.
-        val stackTrace = throwable?.toStackTraceString()
-        // Это краткая строка ошибки для UI и консоли.
-        val throwableSummary = throwable?.let { "${it.javaClass.simpleName}: ${it.message.orEmpty()}".trim() }
+        // Предохранитель: сбой ЛОГИРОВАНИЯ никогда не должен валить приложение (инцидент
+        // 2026-06-12: OOM при сборке лог-строки уронил процесс из сетевого потока). Ловим
+        // Throwable, включая OutOfMemoryError, — здесь это осознанно: лучше потерять одну
+        // запись журнала, чем процесс. Сбой не логируем сами — логгер о сбое логгера
+        // сообщить безопасно не может (это и была петля).
+        val entry = runCatching {
+            // Это подготовка stack trace в строку.
+            val stackTrace = throwable?.toStackTraceString()
+            // Это краткая строка ошибки для UI и консоли.
+            val throwableSummary = throwable?.let { "${it.javaClass.simpleName}: ${it.message.orEmpty()}".trim() }
 
-        // Это итоговая запись журнала.
-        val entry = EshretTalkerLogEntry(
-            id = nextId.getAndIncrement(),
-            timestampMillis = System.currentTimeMillis(),
-            level = level,
-            tag = tag,
-            message = message,
-            details = details,
-            throwableSummary = throwableSummary,
-            stackTrace = stackTrace,
-        )
+            // Это итоговая запись журнала.
+            EshretTalkerLogEntry(
+                id = nextId.getAndIncrement(),
+                timestampMillis = System.currentTimeMillis(),
+                level = level,
+                tag = tag,
+                message = message,
+                details = details,
+                throwableSummary = throwableSummary,
+                stackTrace = stackTrace,
+            )
+        }.getOrElse { return }
 
         // Это обновление in-memory буфера с ограничением длины.
-        _logs.update { current ->
-            (current + entry).takeLast(config.maxEntries)
+        runCatching {
+            _logs.update { current ->
+                (current + entry).takeLast(config.maxEntries)
+            }
         }
 
-        // Это отправка записи во все внешние sink-приёмники.
+        // Это отправка записи во все внешние sink-приёмники. Каждый sink изолирован:
+        // упавший sink (Logcat/телеметрия/любой кастомный) не мешает остальным и не роняет вызывающего.
         sinks.forEach { sink ->
-            sink.log(entry)
+            runCatching { sink.log(entry) }
         }
     }
 
