@@ -1,5 +1,6 @@
 # Gradle, IDE, and build artifacts.
 
+.DS_Store
 .gradle/
 .kotlin/
 build/

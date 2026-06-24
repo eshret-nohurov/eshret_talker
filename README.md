@@ -61,9 +61,19 @@ You can depend on only the modules you need. `ui` and `okhttp` depend on `core`.
 
 ## Installation
 
-Releases are published via [JitPack](https://jitpack.io/#eshret-nohurov/eshret_talker).
+The library is published to **Maven Central**, so for most projects you only need
+`mavenCentral()` in your repositories and the modules you want:
 
-Add the JitPack repository to your `settings.gradle.kts`:
+```kotlin
+dependencies {
+    implementation("io.github.eshret-nohurov:eshret-talker-core:0.1.0")
+    implementation("io.github.eshret-nohurov:eshret-talker-ui:0.1.0")
+    implementation("io.github.eshret-nohurov:eshret-talker-okhttp:0.1.0")
+}
+```
+
+It is also available via [JitPack](https://jitpack.io/#eshret-nohurov/eshret_talker). Add the
+JitPack repository to your `settings.gradle.kts`:
 
 ```kotlin
 dependencyResolutionManagement {
@@ -75,7 +85,7 @@ dependencyResolutionManagement {
 }
 ```
 
-Then add the modules you need (replace `0.1.0` with the latest tag):
+and use the JitPack coordinates instead (the version is any pushed git tag, e.g. `0.1.0`):
 
 ```kotlin
 dependencies {
@@ -84,9 +94,6 @@ dependencies {
     implementation("com.github.eshret-nohurov.eshret_talker:eshret-talker-okhttp:0.1.0")
 }
 ```
-
-> The `com.github.eshret-nohurov.eshret_talker` group id is JitPack's coordinate for a
-> multi-module project. The version is any pushed git tag (for example `0.1.0`) or commit hash.
 
 ## Quick start
 
