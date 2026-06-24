@@ -47,25 +47,13 @@ gpg --keyserver keyserver.ubuntu.com --send-keys <KEY_ID>
 gpg --export-secret-keys --armor <KEY_ID> > signing-key.asc
 ```
 
-### 3. Add the publishing plugin
+### 3. Build configuration (already done)
 
-The recommended way is the [`com.vanniktech.maven.publish`](https://github.com/vanniktech/gradle-maven-publish-plugin)
-plugin, which handles signing and uploading to the Central Portal. Add it to each library
-module and set the coordinates:
-
-```kotlin
-plugins {
-    id("com.vanniktech.maven.publish") version "0.30.0"
-}
-
-mavenPublishing {
-    publishToMavenCentral(automaticRelease = true)
-    signAllPublications()
-    coordinates("io.github.eshret-nohurov", project.name, project.version.toString())
-}
-```
-
-Update `POM_GROUP_ID` in `gradle.properties` to `io.github.eshret-nohurov`.
+The build is already wired with the [`com.vanniktech.maven.publish`](https://github.com/vanniktech/gradle-maven-publish-plugin)
+plugin in `build.gradle.kts`: it publishes every module to the Central Portal under the group
+`io.github.eshret-nohurov` (`POM_GROUP_ID` in `gradle.properties`), attaches sources and javadoc
+jars, and fills in the POM metadata. Signing is enabled automatically only when a signing key is
+present, so local builds and JitPack keep working without one. You do not need to edit the build.
 
 ### 4. Provide credentials
 

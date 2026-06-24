@@ -1,15 +1,15 @@
-import com.android.build.api.dsl.LibraryExtension
+import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import org.gradle.api.Project
-import org.gradle.api.publish.PublishingExtension
-import org.gradle.api.publish.maven.MavenPublication
 
 // Этот файл описывает корневую Gradle-конфигурацию библиотеки eshret_talker.
-// Здесь мы задаём общие group/version и публикацию release-артефактов для всех Android-модулей.
+// Здесь мы задаём общие group/version и публикацию модулей в Maven Central и mavenLocal
+// (через плагин com.vanniktech.maven.publish), а также POM-метаданные для каждого артефакта.
 
 plugins {
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.maven.publish) apply false
 }
 
 fun Project.requiredProperty(name: String): String =
@@ -31,58 +31,56 @@ val modulePomDescriptions = mapOf(
 
 subprojects {
     plugins.withId("com.android.library") {
-        pluginManager.apply("maven-publish")
+        pluginManager.apply("com.vanniktech.maven.publish")
 
-        extensions.configure<LibraryExtension> {
-            publishing {
-                singleVariant("release") {
-                    withSourcesJar()
-                }
+        // Подпись включаем ТОЛЬКО когда задан ключ (то есть при релизе в Maven Central).
+        // Иначе publishToMavenLocal (им пользуется JitPack) падал бы из-за отсутствия signatory.
+        val signingConfigured = providers.gradleProperty("signingInMemoryKey").isPresent ||
+            providers.gradleProperty("signing.keyId").isPresent
+
+        extensions.configure<MavenPublishBaseExtension> {
+            // Публикация в Maven Central (Central Portal) и автоматический релиз после загрузки.
+            publishToMavenCentral()
+            // Подпись артефактов GPG нужна для Maven Central; локально она не требуется.
+            if (signingConfigured) {
+                signAllPublications()
             }
-        }
 
-        extensions.configure<PublishingExtension> {
-            publications {
-                register<MavenPublication>("release") {
-                    groupId = rootProject.group.toString()
-                    artifactId = project.name
-                    version = rootProject.version.toString()
+            coordinates(
+                groupId = rootProject.group.toString(),
+                artifactId = project.name,
+                version = rootProject.version.toString(),
+            )
 
-                    pom {
-                        name.set(project.name)
-                        description.set(
-                            modulePomDescriptions[project.name]
-                                ?: rootProject.requiredProperty("POM_DESCRIPTION"),
-                        )
-                        url.set(rootProject.requiredProperty("POM_URL"))
-                        inceptionYear.set(rootProject.requiredProperty("POM_INCEPTION_YEAR"))
+            pom {
+                name.set(project.name)
+                description.set(
+                    modulePomDescriptions[project.name]
+                        ?: rootProject.requiredProperty("POM_DESCRIPTION"),
+                )
+                inceptionYear.set(rootProject.requiredProperty("POM_INCEPTION_YEAR"))
+                url.set(rootProject.requiredProperty("POM_URL"))
 
-                        licenses {
-                            license {
-                                name.set(rootProject.requiredProperty("POM_LICENSE_NAME"))
-                                url.set(rootProject.requiredProperty("POM_LICENSE_URL"))
-                                distribution.set(rootProject.requiredProperty("POM_LICENSE_DIST"))
-                            }
-                        }
-
-                        developers {
-                            developer {
-                                id.set(rootProject.requiredProperty("POM_DEVELOPER_ID"))
-                                name.set(rootProject.requiredProperty("POM_DEVELOPER_NAME"))
-                                url.set(rootProject.requiredProperty("POM_DEVELOPER_URL"))
-                            }
-                        }
-
-                        scm {
-                            url.set(rootProject.requiredProperty("POM_SCM_URL"))
-                            connection.set(rootProject.requiredProperty("POM_SCM_CONNECTION"))
-                            developerConnection.set(rootProject.requiredProperty("POM_SCM_DEV_CONNECTION"))
-                        }
+                licenses {
+                    license {
+                        name.set(rootProject.requiredProperty("POM_LICENSE_NAME"))
+                        url.set(rootProject.requiredProperty("POM_LICENSE_URL"))
+                        distribution.set(rootProject.requiredProperty("POM_LICENSE_DIST"))
                     }
+                }
 
-                    project.afterEvaluate {
-                        from(project.components["release"])
+                developers {
+                    developer {
+                        id.set(rootProject.requiredProperty("POM_DEVELOPER_ID"))
+                        name.set(rootProject.requiredProperty("POM_DEVELOPER_NAME"))
+                        url.set(rootProject.requiredProperty("POM_DEVELOPER_URL"))
                     }
+                }
+
+                scm {
+                    url.set(rootProject.requiredProperty("POM_SCM_URL"))
+                    connection.set(rootProject.requiredProperty("POM_SCM_CONNECTION"))
+                    developerConnection.set(rootProject.requiredProperty("POM_SCM_DEV_CONNECTION"))
                 }
             }
         }
