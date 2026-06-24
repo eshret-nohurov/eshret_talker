@@ -8,10 +8,12 @@
 
 **Made in Turkmenistan 🇹🇲 by [eshret-nohurov](https://github.com/eshret-nohurov)**
 
-`eshret_talker` is a lightweight Android logging toolkit built from three small modules:
-an in-memory logger core, a Jetpack Compose log viewer, and an OkHttp interceptor for
-readable HTTP traces. It is designed to be a drop-in in-app debug console for development
-and QA.
+> **See your app's logs and HTTP traffic right on the device — no Logcat, no cable.**
+
+`eshret_talker` is a drop-in **in-app debug console** for Android. Add one Compose screen and
+get a searchable, color-coded log viewer with readable HTTP traces, on-disk session history,
+and one-tap share — built for debugging on real devices and handing builds to QA. It is
+crash-safe by design: a failure inside logging never takes down your app.
 
 ## Table of contents
 
