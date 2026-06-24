@@ -1,4 +1,5 @@
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
+import com.vanniktech.maven.publish.SonatypeHost
 import org.gradle.api.Project
 
 // Этот файл описывает корневую Gradle-конфигурацию библиотеки eshret_talker.
@@ -36,11 +37,12 @@ subprojects {
         // Подпись включаем ТОЛЬКО когда задан ключ (то есть при релизе в Maven Central).
         // Иначе publishToMavenLocal (им пользуется JitPack) падал бы из-за отсутствия signatory.
         val signingConfigured = providers.gradleProperty("signingInMemoryKey").isPresent ||
+            providers.environmentVariable("ORG_GRADLE_PROJECT_signingInMemoryKey").isPresent ||
             providers.gradleProperty("signing.keyId").isPresent
 
         extensions.configure<MavenPublishBaseExtension> {
-            // Публикация в Maven Central (Central Portal) и автоматический релиз после загрузки.
-            publishToMavenCentral()
+            // Публикация именно в новый Central Portal (central.sonatype.com), а не в старый OSSRH.
+            publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
             // Подпись артефактов GPG нужна для Maven Central; локально она не требуется.
             if (signingConfigured) {
                 signAllPublications()
