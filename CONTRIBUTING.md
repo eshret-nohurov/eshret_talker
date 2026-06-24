@@ -1,59 +1,59 @@
-# Как вносить вклад в eshret_talker
+# Contributing to eshret_talker
 
-Спасибо за интерес к проекту `eshret_talker`.
-Репозиторий построен как переиспользуемая Android-библиотека, поэтому изменения должны сохранять предсказуемость API и чистое разделение модулей.
+Thanks for your interest in `eshret_talker`. The repository is a reusable Android library, so
+changes should keep the public API predictable and the module boundaries clean.
 
-## Принципы разработки
+## Principles
 
-- четко разделяйте ответственность `core`, `ui` и `okhttp`
-- предпочитайте маленькие и читаемые API вместо перегруженных абстракций
-- сохраняйте читаемость логов и в Logcat, и в Compose UI
-- не допускайте утечки чувствительных данных в HTTP-логах
-- фиксируйте поведенческие изменения в `README.md` и `CHANGELOG.md`
+- keep the responsibilities of `core`, `ui`, and `okhttp` clearly separated
+- prefer small, readable APIs over heavy abstractions
+- keep logs readable both in Logcat and in the Compose UI
+- never leak sensitive data into HTTP logs
+- record behavioral changes in `README.md` and `CHANGELOG.md`
 
-## С чего начать
+## Getting started
 
-1. Сделайте fork репозитория и создайте ветку от `main`.
-2. Вносите изменения небольшими логическими шагами.
-3. Перед открытием Pull Request выполните локальную проверку.
+1. Fork the repository and create a branch from `main`.
+2. Make changes in small, logical steps.
+3. Run the local checks before opening a pull request.
 
-## Локальная проверка
+## Local checks
 
-Используйте Gradle wrapper из корня репозитория:
+Use the Gradle wrapper from the repository root:
 
 ```bash
 ./gradlew assemble
-./gradlew test
+./gradlew testDebugUnitTest
 ```
 
-Если изменение влияет на UI или текстовый вывод, добавьте в PR короткое описание поведения до и после.
+If a change affects the UI or text output, add a short before/after description to the pull request.
 
-## Чеклист Pull Request
+## Pull request checklist
 
-- изменение решает конкретную задачу
-- изменения публичного API осознанны и описаны
-- документация обновлена, если изменилось поведение
-- чувствительные HTTP-данные не утекли в логи
-- сборка и тесты проходят локально
+- the change solves a specific problem
+- public API changes are intentional and documented
+- documentation is updated when behavior changes
+- no sensitive HTTP data leaks into logs
+- the build and tests pass locally
 
-## Стиль кода
+## Code style
 
-- Kotlin-код должен оставаться простым и читаемым
-- комментарии объясняют мотивацию, а не очевидный код
-- примеры должны быть реалистичными и близкими к Android-практике
-- предпочитайте точечные изменения вместо широких рефакторингов без необходимости
+- keep Kotlin code simple and readable
+- comments should explain motivation, not the obvious
+- examples should be realistic and close to real Android usage
+- prefer focused changes over broad refactors without a clear reason
 
-## Оформление Issues
+## Filing issues
 
-При создании issue укажите:
+When opening an issue, include:
 
-- что ожидалось
-- что произошло фактически
-- шаги воспроизведения
-- версию Android и устройство/эмулятор (если важно)
-- минимальный пример кода, если есть
+- what you expected
+- what actually happened
+- steps to reproduce
+- the Android version and device/emulator (if relevant)
+- a minimal code sample, if available
 
-## Вопросы и предложения
+## Questions and proposals
 
-Предложения по API, модульной архитектуре, неймингу и документации приветствуются.
-Для крупных изменений лучше сначала открыть issue и согласовать направление.
+Suggestions about the API, module architecture, naming, and documentation are welcome. For
+larger changes, please open an issue first to align on direction.

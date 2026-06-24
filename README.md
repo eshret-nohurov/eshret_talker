@@ -2,125 +2,117 @@
 
 [![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)](https://developer.android.com/)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
+[![JitPack](https://jitpack.io/v/eshret-nohurov/eshret_talker.svg)](https://jitpack.io/#eshret-nohurov/eshret_talker)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](./LICENSE)
 
-`eshret_talker` — это Android-набор для логирования с тремя модулями:
-in-memory ядро логгера, Compose-экран просмотра логов и OkHttp-interceptor для понятных HTTP-трейсов.
+`eshret_talker` is a lightweight Android logging toolkit built from three small modules:
+an in-memory logger core, a Jetpack Compose log viewer, and an OkHttp interceptor for
+readable HTTP traces. It is designed to be a drop-in in-app debug console for development
+and QA.
 
-Репозиторий оформлен как отдельный библиотечный проект, поэтому его удобно развивать, публиковать во внутренний registry и доводить до публичного пакета.
+## Table of contents
 
-## Содержание
-
-- [Почему eshret_talker](#почему-eshret_talker)
-- [Модули](#модули)
-- [Требования](#требования)
-- [Подключение в проект](#подключение-в-проект)
-- [Артефакты](#артефакты)
-- [Быстрый старт](#быстрый-старт)
+- [Why eshret_talker](#why-eshret_talker)
+- [Modules](#modules)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick start](#quick-start)
 - [Compose UI](#compose-ui)
-- [HTTP-логирование](#http-логирование)
-- [Конфигурация](#конфигурация)
-- [Уровни логов](#уровни-логов)
-- [Локальная разработка](#локальная-разработка)
-- [Публикация](#публикация)
-- [Релизный процесс](#релизный-процесс)
-- [Защита репозитория](#защита-репозитория)
-- [План развития](#план-развития)
-- [Вклад в проект](#вклад-в-проект)
-- [Лицензия](#лицензия)
+- [Sessions](#sessions)
+- [HTTP logging](#http-logging)
+- [Configuration](#configuration)
+- [Log levels](#log-levels)
+- [Building from source](#building-from-source)
+- [Publishing](#publishing)
+- [Contributing](#contributing)
+- [License](#license)
 
-## Почему eshret_talker
+## Why eshret_talker
 
-- читаемые логи для событий приложения, ошибок и сети
-- in-memory история с `StateFlow` для реактивного UI
-- удобный Compose-экран с поиском, фильтрами и разворотом деталей
-- вывод в Logcat включен из коробки
-- безопасное HTTP-логирование с маскированием чувствительных headers
-- простой Kotlin API без тяжелой настройки
+- readable logs for app events, errors, and network traffic
+- in-memory history exposed as a `StateFlow` for reactive UI
+- polished Compose viewer with search, filters, and expandable details
+- Logcat output enabled out of the box
+- safe HTTP logging with masking of sensitive headers by default
+- on-disk sessions: the full history of each app launch, grouped by day and kept for a week
+- a simple Kotlin API with no heavy setup
+- crash-safe by design: a failure inside logging never takes down the caller
 
-## Модули
+## Modules
 
-| Модуль | Назначение |
+| Module | Purpose |
 | --- | --- |
-| `eshret-talker-core` | Базовый логгер, уровни логов, буфер, конфиг, sink-вывод, интеграция с Logcat |
-| `eshret-talker-ui` | Compose-экран и bottom sheet для просмотра логов внутри приложения |
-| `eshret-talker-okhttp` | OkHttp-interceptor для логирования запросов и ответов |
+| `eshret-talker-core` | Logger core: log levels, in-memory buffer, configuration, sink output, Logcat integration, and optional on-disk sessions |
+| `eshret-talker-ui` | Compose screen and bottom sheet for browsing logs and sessions inside the app |
+| `eshret-talker-okhttp` | OkHttp interceptor that turns requests and responses into readable traces |
 
-## Требования
+You can depend on only the modules you need. `ui` and `okhttp` depend on `core`.
 
-- Android `minSdk 26`
+## Requirements
+
+- Android `minSdk 24`
 - `compileSdk 35`
 - Java 17
 - Kotlin 2.2.20
 
-## Подключение в проект
+## Installation
 
-Сейчас репозиторий устроен как multi-module Android library проект.
-Если используете его локально в той же сборке, подключайте только нужные модули:
+Releases are published via [JitPack](https://jitpack.io/#eshret-nohurov/eshret_talker).
+
+Add the JitPack repository to your `settings.gradle.kts`:
 
 ```kotlin
-dependencies {
-    implementation(project(":eshret-talker-core"))
-    implementation(project(":eshret-talker-ui"))
-    implementation(project(":eshret-talker-okhttp"))
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+    }
 }
 ```
 
-## Артефакты
-
-При публикации модули используют такие координаты:
-
-| Модуль | Maven-координата |
-| --- | --- |
-| Core | `com.eshret.talker:eshret-talker-core:0.1.0-local` |
-| UI | `com.eshret.talker:eshret-talker-ui:0.1.0-local` |
-| OkHttp | `com.eshret.talker:eshret-talker-okhttp:0.1.0-local` |
-
-Пример подключения зависимостей из Maven-репозитория или `mavenLocal()`:
+Then add the modules you need (replace `0.1.0` with the latest tag):
 
 ```kotlin
-repositories {
-    mavenLocal()
-    mavenCentral()
-    google()
-}
-
 dependencies {
-    implementation("com.eshret.talker:eshret-talker-core:0.1.0-local")
-    implementation("com.eshret.talker:eshret-talker-ui:0.1.0-local")
-    implementation("com.eshret.talker:eshret-talker-okhttp:0.1.0-local")
+    implementation("com.github.eshret-nohurov.eshret_talker:eshret-talker-core:0.1.0")
+    implementation("com.github.eshret-nohurov.eshret_talker:eshret-talker-ui:0.1.0")
+    implementation("com.github.eshret-nohurov.eshret_talker:eshret-talker-okhttp:0.1.0")
 }
 ```
 
-## Быстрый старт
+> The `com.github.eshret-nohurov.eshret_talker` group id is JitPack's coordinate for a
+> multi-module project. The version is any pushed git tag (for example `0.1.0`) or commit hash.
 
-Создаем логгер:
+## Quick start
+
+Create a logger:
 
 ```kotlin
 val talker = EshretTalker()
 ```
 
-Пишем логи:
+Write logs:
 
 ```kotlin
 talker.info(
-    message = "Открыли экран Home",
+    message = "Opened Home screen",
     tag = "HOME",
 )
 
 talker.success(
-    message = "Подборка загружена",
+    message = "Feed loaded",
     tag = "HOME",
 )
 
 talker.error(
-    message = "Не удалось загрузить рекомендации",
+    message = "Failed to load recommendations",
     tag = "HOME",
     throwable = exception,
 )
 ```
 
-Обрабатываем исключения одним вызовом:
+Handle exceptions in one call:
 
 ```kotlin
 runCatching {
@@ -128,7 +120,7 @@ runCatching {
 }.onFailure { throwable ->
     talker.handle(
         throwable = throwable,
-        message = "Ошибка обновления",
+        message = "Refresh failed",
         tag = "HOME",
     )
 }
@@ -136,7 +128,7 @@ runCatching {
 
 ## Compose UI
 
-Используйте полноэкранный просмотрщик, если нужен внутренний debug-console для QA и разработки:
+Use the full-screen viewer as an in-app debug console for development and QA:
 
 ```kotlin
 EshretTalkerScreen(
@@ -144,7 +136,7 @@ EshretTalkerScreen(
 )
 ```
 
-Или покажите его как полноэкранный bottom sheet:
+Or present it as a full-screen bottom sheet:
 
 ```kotlin
 EshretTalkerBottomSheet(
@@ -153,23 +145,63 @@ EshretTalkerBottomSheet(
 )
 ```
 
-В UI уже есть:
+The viewer includes:
 
-- полноэкранное открытие bottom sheet без промежуточного состояния
-- app bar с меню действий
-- смена порядка списка через `SwapVert` с прокруткой к началу
-- очистка истории из action sheet
-- копирование полного списка логов
-- системный share `.txt` файла со всеми логами
-- цветные карточки по уровню лога
-- поиск по сообщению, тегу и деталям
-- компактные горизонтальные фильтры видимости по типам логов
-- разворот деталей и stack trace
-- полноэкранный просмотр `body` с удобным JSON viewer (раскрытие/сворачивание вложенных объектов и массивов)
+- an app bar with an actions menu
+- list ordering toggle (newest or oldest first) with scroll-to-top
+- history clearing from the actions sheet
+- copy the full log list to the clipboard
+- system share of all logs as a `.txt` file
+- color-coded cards per log level
+- search across message, tag, and details
+- compact horizontal visibility filters per log level
+- expandable details and stack traces
+- a full-screen `body` viewer with a JSON tree (expand and collapse nested objects and arrays)
 
-## HTTP-логирование
+## Sessions
 
-Подключите interceptor к `OkHttpClient`:
+The logger can persist history as sessions on disk. A session is created when `EshretTalker`
+is initialized (that is, on every app launch) and keeps **all** of its entries — even tens of
+thousands (the in-memory `maxEntries` limit does not apply to storage).
+
+Enable it by passing a session store:
+
+```kotlin
+val talker = EshretTalker(
+    sessionStore = FileEshretTalkerSessionStore(context.filesDir),
+)
+```
+
+Without a `sessionStore` the logger behaves exactly as before, and the "Sessions" button does
+not appear in the UI.
+
+Behavior:
+
+- sessions are named by their start time and grouped by day
+- sessions are kept for 7 days; anything older is removed on the next launch
+- writes happen in the background and never block or crash the caller
+- secrets in HTTP logs stay masked in stored sessions as well
+
+In the Compose UI a "Sessions" button appears next to the actions menu:
+
+- a list of sessions grouped by day, showing the session time, how long ago it ended, and the
+  number of entries
+- tapping a session opens its logs in the same viewer (search, filters, details)
+- you can copy all of a session's logs or share them as a `.txt` file
+- delete a single session or all sessions at once
+
+The retention period is configurable:
+
+```kotlin
+val sessionStore = FileEshretTalkerSessionStore(
+    rootDirectory = context.filesDir,
+    retentionDays = 7,
+)
+```
+
+## HTTP logging
+
+Attach the interceptor to your `OkHttpClient`:
 
 ```kotlin
 val client = OkHttpClient.Builder()
@@ -177,17 +209,20 @@ val client = OkHttpClient.Builder()
     .build()
 ```
 
-Interceptor логирует:
+The interceptor logs:
 
-- метод и URL запроса
-- код ответа и длительность
-- headers с маскированием чувствительных значений
-- полный текстовый body для удобного копирования и диагностики
-- сетевые ошибки со stack trace
+- request method and URL
+- response code and duration
+- headers with sensitive values masked
+- the full text body for easy copying and diagnostics
+- network failures with a stack trace
 
-## Конфигурация
+Sensitive headers (`authorization`, `cookie`, `set-cookie`, `x-api-key`, `x-access-token`)
+are masked by default, even when you provide your own settings.
 
-`eshret-talker-core` настраивается через `EshretTalkerConfig`:
+## Configuration
+
+`eshret-talker-core` is configured through `EshretTalkerConfig`:
 
 ```kotlin
 val talker = EshretTalker(
@@ -200,7 +235,7 @@ val talker = EshretTalker(
 )
 ```
 
-Можно отправлять логи в дополнительные sink-обработчики:
+You can forward logs to additional sinks:
 
 ```kotlin
 val analyticsSink = EshretTalkerSink { entry ->
@@ -212,9 +247,9 @@ val talker = EshretTalker(
 )
 ```
 
-Глобально отключить логирование можно через `enabled = false` в `EshretTalkerConfig`.
+Logging can be disabled globally with `enabled = false` in `EshretTalkerConfig`.
 
-Тонкая настройка HTTP-логирования:
+Fine-tune HTTP logging:
 
 ```kotlin
 val httpLoggerSettings = EshretTalkerOkHttpLoggerSettings(
@@ -236,78 +271,38 @@ val client = OkHttpClient.Builder()
     .build()
 ```
 
-## Уровни логов
+`logLevel` acts as a verbosity switch: `VERBOSE`/`DEBUG` log all traffic, while `INFO` and
+above suppress normal traffic and keep only errors (`4xx`/`5xx` and network failures).
 
-`VERBOSE`, `DEBUG`, `INFO`, `NAVIGATION`, `SUCCESS`, `WARNING`, `ERROR`, `CRITICAL`, `HTTP OUT`, `HTTP IN`
+## Log levels
 
-## Локальная разработка
+`VERBOSE`, `DEBUG`, `INFO`, `NAVIGATION`, `SUCCESS`, `WARNING`, `ERROR`, `CRITICAL`,
+`HTTP OUT`, `HTTP IN`
 
-Основные команды для репозитория:
+## Building from source
 
 ```bash
 ./gradlew assemble
-./gradlew test
+./gradlew testDebugUnitTest
 ```
 
-## Публикация
+## Publishing
 
-Проект уже настроен на `maven-publish` для каждого Android library-модуля.
-Каждый модуль публикует `release`-артефакт с sources и POM-метаданными.
+Each Android library module is configured for `maven-publish` and publishes a `release`
+artifact with sources and POM metadata.
 
-Локальная публикация:
+Publish to your local Maven repository:
 
 ```bash
 ./gradlew publishToMavenLocal
 ```
 
-Проверка генерации POM без публикации артефактов в домашний каталог:
+See [RELEASING.md](./RELEASING.md) for the release process.
 
-```bash
-./gradlew :eshret-talker-core:generatePomFileForReleasePublication
-./gradlew :eshret-talker-ui:generatePomFileForReleasePublication
-./gradlew :eshret-talker-okhttp:generatePomFileForReleasePublication
-```
+## Contributing
 
-## Релизный процесс
+Contribution guidelines are described in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-Базовый сценарий релиза:
+## License
 
-1. Обновить `POM_VERSION` в `gradle.properties`.
-2. Добавить релизные заметки в `CHANGELOG.md`.
-3. Запустить `./gradlew test`.
-4. Создать и отправить git tag.
-5. Оформить GitHub Release по этому tag.
-
-Подробно это описано в [RELEASING.md](./RELEASING.md).
-
-## Защита репозитория
-
-Чтобы никто, кроме вас, не вносил прямые изменения в `main`, в репозитории уже добавлен `CODEOWNERS`.
-Дальше нужно включить branch protection в GitHub (пошагово описано в [REPOSITORY_PROTECTION.md](./REPOSITORY_PROTECTION.md)).
-
-Рекомендуемая модель для библиотек:
-
-- прямые push в `main` запрещены
-- изменения только через Pull Request
-- обязательный review от code owner
-- обязательный статус `build/test`
-- запрещены force-push и удаление ветки `main`
-
-## План развития
-
-Библиотека уже закрывает основной сценарий: логи приложения, обработка ошибок, in-app просмотр и HTTP-трейсинг.
-
-Следующие улучшения:
-
-- скриншоты или GIF для Compose UI
-- расширенные тесты фильтров и форматирования interceptor
-- релизные заметки для каждой версии
-
-## Вклад в проект
-
-Правила и ожидания по PR описаны в [CONTRIBUTING.md](./CONTRIBUTING.md).
-
-## Лицензия
-
-Проект распространяется по лицензии Apache License 2.0.
-Текст лицензии: [LICENSE](./LICENSE).
+Distributed under the Apache License 2.0. See [LICENSE](./LICENSE) for details.

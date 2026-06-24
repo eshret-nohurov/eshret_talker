@@ -1,5 +1,4 @@
-# Этот файл описывает git-игнор для отдельного репозитория библиотеки eshret_talker.
-# Здесь мы исключаем служебные Gradle-файлы, локальные настройки IDE и артефакты сборки.
+# Gradle, IDE, and build artifacts.
 
 .gradle/
 .kotlin/
@@ -8,3 +7,7 @@ local.properties
 .idea/
 *.iml
 captures/
+
+# Local tooling and assistant files (kept out of the repository).
+CLAUDE.md
+.claude/
