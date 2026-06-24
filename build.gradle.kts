@@ -24,9 +24,9 @@ allprojects {
 }
 
 val modulePomDescriptions = mapOf(
-    "eshret-talker-core" to "Ядро логгера с хранением в памяти, уровнями логов, sink-выводом и интеграцией с Logcat.",
-    "eshret-talker-ui" to "Jetpack Compose-экран для просмотра, фильтрации и анализа логов eshret_talker внутри приложения.",
-    "eshret-talker-okhttp" to "OkHttp-interceptor, который отправляет читаемые трейсы запросов и ответов в eshret_talker.",
+    "eshret-talker-core" to "Logger core with an in-memory buffer, log levels, sink output, on-disk sessions, and Logcat integration.",
+    "eshret-talker-ui" to "Jetpack Compose screen for browsing, filtering, and analyzing eshret_talker logs inside the app.",
+    "eshret-talker-okhttp" to "OkHttp interceptor that sends readable request and response traces to eshret_talker.",
 )
 
 subprojects {
