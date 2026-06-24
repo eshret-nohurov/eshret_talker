@@ -5,6 +5,8 @@
 [![JitPack](https://jitpack.io/v/eshret-nohurov/eshret_talker.svg)](https://jitpack.io/#eshret-nohurov/eshret_talker)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](./LICENSE)
 
+**Made in Turkmenistan 🇹🇲 by [eshret-nohurov](https://github.com/eshret-nohurov)**
+
 `eshret_talker` is a lightweight Android logging toolkit built from three small modules:
 an in-memory logger core, a Jetpack Compose log viewer, and an OkHttp interceptor for
 readable HTTP traces. It is designed to be a drop-in in-app debug console for development
@@ -25,6 +27,7 @@ and QA.
 - [Building from source](#building-from-source)
 - [Publishing](#publishing)
 - [Contributing](#contributing)
+- [Author](#author)
 - [License](#license)
 
 ## Why eshret_talker
@@ -297,11 +300,21 @@ Publish to your local Maven repository:
 ./gradlew publishToMavenLocal
 ```
 
-See [RELEASING.md](./RELEASING.md) for the release process.
+Releases are available via [JitPack](https://jitpack.io/#eshret-nohurov/eshret_talker).
+See [PUBLISHING.md](./PUBLISHING.md) for distribution channels and Maven Central setup, and
+[RELEASING.md](./RELEASING.md) for the release process.
 
 ## Contributing
 
 Contribution guidelines are described in [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+## Author
+
+Built and maintained by [**eshret-nohurov**](https://github.com/eshret-nohurov) 🇹🇲 — from Turkmenistan.
+
+- GitHub — [@eshret-nohurov](https://github.com/eshret-nohurov)
+- Telegram — [@eshret_prog](https://t.me/eshret_prog)
+- Instagram — [@eshret_nohurov](https://www.instagram.com/eshret_nohurov)
 
 ## License
 
