@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -77,6 +78,14 @@ import androidx.compose.ui.window.DialogProperties
 // Этот файл описывает основной Compose-экран журнала библиотеки eshret_talker.
 // Здесь мы показываем компактный toolbar, горизонтальные фильтры, поиск и действия для экспорта логов.
 
+// Это маршруты внутри просмотрщика: живой журнал, список сессий и логи конкретной сессии.
+// Навигация держится на локальном состоянии — отдельная nav-библиотека сюда не тянется.
+private sealed interface EshretTalkerScreenRoute {
+    data object Live : EshretTalkerScreenRoute
+    data object SessionList : EshretTalkerScreenRoute
+    data class SessionDetail(val sessionId: String) : EshretTalkerScreenRoute
+}
+
 @Composable
 fun EshretTalkerScreen(
     // Это экземпляр логгера, чьи записи нужно показать.
@@ -85,6 +94,68 @@ fun EshretTalkerScreen(
     modifier: Modifier = Modifier,
     // Это флаг учёта верхней системной панели для полноэкранного sheet.
     respectStatusBarInsets: Boolean = false,
+) {
+    // Это хранилище сессий; если оно не подключено — кнопка «Сессии» и её экраны недоступны.
+    val sessionStore = talker.sessions
+    // Это текущий маршрут просмотрщика.
+    var route by remember(sessionStore) {
+        mutableStateOf<EshretTalkerScreenRoute>(EshretTalkerScreenRoute.Live)
+    }
+
+    when (val current = route) {
+        EshretTalkerScreenRoute.Live -> EshretTalkerLiveLogScreen(
+            talker = talker,
+            modifier = modifier,
+            respectStatusBarInsets = respectStatusBarInsets,
+            onOpenSessions = sessionStore?.let { { route = EshretTalkerScreenRoute.SessionList } },
+        )
+
+        EshretTalkerScreenRoute.SessionList -> if (sessionStore != null) {
+            EshretTalkerSessionsScreen(
+                store = sessionStore,
+                modifier = modifier,
+                respectStatusBarInsets = respectStatusBarInsets,
+                onOpenSession = { sessionId ->
+                    route = EshretTalkerScreenRoute.SessionDetail(sessionId)
+                },
+                onBack = { route = EshretTalkerScreenRoute.Live },
+            )
+        } else {
+            EshretTalkerLiveLogScreen(
+                talker = talker,
+                modifier = modifier,
+                respectStatusBarInsets = respectStatusBarInsets,
+            )
+        }
+
+        is EshretTalkerScreenRoute.SessionDetail -> if (sessionStore != null) {
+            EshretTalkerSessionLogScreen(
+                store = sessionStore,
+                sessionId = current.sessionId,
+                modifier = modifier,
+                respectStatusBarInsets = respectStatusBarInsets,
+                onBack = { route = EshretTalkerScreenRoute.SessionList },
+            )
+        } else {
+            EshretTalkerLiveLogScreen(
+                talker = talker,
+                modifier = modifier,
+                respectStatusBarInsets = respectStatusBarInsets,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EshretTalkerLiveLogScreen(
+    // Это экземпляр логгера, чьи записи нужно показать.
+    talker: EshretTalker,
+    // Это внешний модификатор экрана.
+    modifier: Modifier = Modifier,
+    // Это флаг учёта верхней системной панели для полноэкранного sheet.
+    respectStatusBarInsets: Boolean = false,
+    // Это переход к экрану сессий; null прячет кнопку «Сессии» (хранилище не подключено).
+    onOpenSessions: (() -> Unit)? = null,
 ) {
     // Это текущий список записей из логгера.
     val entries by talker.logs.collectAsState()
@@ -204,6 +275,7 @@ fun EshretTalkerScreen(
             EshretTalkerTopBar(
                 respectStatusBarInsets = respectStatusBarInsets,
                 newestFirst = newestFirst,
+                onSessionsClick = onOpenSessions,
                 onActionsClick = { showActionsSheet = true },
                 onReverseOrderClick = {
                     newestFirst = !newestFirst
@@ -331,6 +403,7 @@ fun EshretTalkerScreen(
 private fun EshretTalkerTopBar(
     respectStatusBarInsets: Boolean,
     newestFirst: Boolean,
+    onSessionsClick: (() -> Unit)?,
     onActionsClick: () -> Unit,
     onReverseOrderClick: () -> Unit,
 ) {
@@ -376,6 +449,15 @@ private fun EshretTalkerTopBar(
                     },
                     tint = EshretTalkerTextPrimary,
                 )
+            }
+            if (onSessionsClick != null) {
+                IconButton(onClick = onSessionsClick) {
+                    Icon(
+                        imageVector = Icons.Filled.History,
+                        contentDescription = "Открыть сессии",
+                        tint = EshretTalkerTextPrimary,
+                    )
+                }
             }
             IconButton(onClick = onActionsClick) {
                 Icon(
@@ -456,7 +538,7 @@ private fun EshretTalkerCollapsibleControls(
 }
 
 @Composable
-private fun EshretTalkerCompactLevelChip(
+internal fun EshretTalkerCompactLevelChip(
     level: EshretTalkerLevel,
     selected: Boolean,
     onClick: () -> Unit,
@@ -566,7 +648,7 @@ private fun EshretTalkerActionsBottomSheet(
 }
 
 @Composable
-private fun EshretTalkerLogCard(
+internal fun EshretTalkerLogCard(
     entry: EshretTalkerLogEntry,
 ) {
     // Это стиль уровня для цвета карточки.
@@ -838,11 +920,11 @@ private fun String.removeHttpBodySection(): String? {
         .takeIf { it.isNotBlank() }
 }
 
-private fun <T> Set<T>.toggle(item: T): Set<T> =
+internal fun <T> Set<T>.toggle(item: T): Set<T> =
     if (item in this) this - item else this + item
 
 
-private fun showTalkerToast(
+internal fun showTalkerToast(
     context: android.content.Context,
     message: String,
 ) {

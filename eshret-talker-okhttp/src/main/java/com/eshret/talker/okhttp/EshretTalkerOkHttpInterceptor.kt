@@ -16,16 +16,9 @@ import okhttp3.Response
 class EshretTalkerOkHttpInterceptor(
     // Это экземпляр логгера, куда будут уходить HTTP-события.
     private val talker: EshretTalker,
-    // Это набор настроек сетевого логгера.
-    private val settings: EshretTalkerOkHttpLoggerSettings = EshretTalkerOkHttpLoggerSettings(
-        hiddenHeaders = setOf(
-            "authorization",
-            "cookie",
-            "set-cookie",
-            "x-api-key",
-            "x-access-token",
-        ),
-    ),
+    // Это набор настроек сетевого логгера. Безопасные дефолты (включая маскирование
+    // чувствительных headers) заданы в самом EshretTalkerOkHttpLoggerSettings.
+    private val settings: EshretTalkerOkHttpLoggerSettings = EshretTalkerOkHttpLoggerSettings(),
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         // Это ранний пропуск, если сетевой логгер отключён.
@@ -54,7 +47,7 @@ class EshretTalkerOkHttpInterceptor(
 
         // Это лог исходящего запроса. Предохранитель: сбой сборки деталей или самого логирования
         // (инцидент 2026-06-12: OOM на склейке лог-строки) не должен ломать сетевой вызов.
-        if (shouldLogRequest && settings.logLevel.allowsRequestLogging()) {
+        if (shouldLogRequest && settings.logLevel.allowsTrafficLogging()) {
             runCatching {
                 talker.httpRequest(
                     message = "--> $method $target",
@@ -80,10 +73,13 @@ class EshretTalkerOkHttpInterceptor(
                     val responseDetails = buildResponseDetails(response, tookMs)
                     val message = buildResponseMessage(response = response, method = method, target = target, tookMs = tookMs)
                     if (response.isSuccessful) {
-                        if (settings.logLevel.allowsRequestLogging()) {
+                        if (settings.logLevel.allowsTrafficLogging()) {
                             talker.httpResponse(message = message, details = responseDetails)
                         }
-                    } else if (settings.logLevel.allowsErrorLogging()) {
+                    } else {
+                        // Неуспешные ответы (4xx/5xx) логируем всегда: ошибки важнее уровня
+                        // подробности трафика, поэтому verbosity-дайл logLevel их не подавляет.
+                        // Отключить можно только через settings.enabled или responseFilter.
                         talker.error(message = message, tag = "HTTP", details = responseDetails)
                     }
                 }
@@ -97,8 +93,9 @@ class EshretTalkerOkHttpInterceptor(
 
             // Это лог сетевого сбоя. Предохранитель: именно на этом пути случился OOM-краш
             // 2026-06-12 (сборка деталей с телом запроса в сетевом потоке) — сбой логирования
-            // не должен подменять исходную сетевую ошибку.
-            if (shouldLogError && settings.logLevel.allowsErrorLogging()) {
+            // не должен подменять исходную сетевую ошибку. Сетевые ошибки логируем всегда,
+            // независимо от logLevel (см. ветку 4xx/5xx выше) — отсекаются только errorFilter'ом.
+            if (shouldLogError) {
                 runCatching {
                     talker.error(
                         message = "<-- HTTP FAILED $method $target (${tookMs} ms)",
@@ -272,13 +269,15 @@ private fun readRequestBodyPreview(
 ): String? {
     if (!contentType.isProbablyTextual()) return "(binary body omitted)"
 
+    // Это кодировка из Content-Type (например, charset=windows-1251), с откатом на UTF-8.
+    val charset = contentType?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
     // Защита от нештатных настроек: лимит ниже 1 или выше Int.MAX_VALUE ломал бы чтение/String().
     val safeLimit = limit.coerceIn(1L, Int.MAX_VALUE.toLong() - 16)
     val buffer = okio.Buffer()
     body.writeTo(buffer)
-    if (buffer.size <= safeLimit) return buffer.readUtf8()
+    if (buffer.size <= safeLimit) return buffer.readString(charset)
     val totalBytes = buffer.size
-    val preview = buffer.readUtf8(safeLimit)
+    val preview = buffer.readString(safeLimit, charset)
     return "$preview\n…(body truncated: shown $safeLimit of $totalBytes bytes)"
 }
 
@@ -289,12 +288,14 @@ private fun readResponseBodyPreview(
 ): String? {
     val contentType = response.body?.contentType()
     if (!contentType.isProbablyTextual()) return "(binary body omitted)"
+    // Это кодировка из Content-Type ответа, с откатом на UTF-8.
+    val charset = contentType?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
     // Защита от нештатных настроек: лимит ниже 1 или выше Int.MAX_VALUE ломал бы чтение/String().
     val safeLimit = limit.coerceIn(1L, Int.MAX_VALUE.toLong() - 16)
     // Читаем safeLimit + 1 байт: лишний байт нужен только чтобы понять, что тело длиннее лимита.
     val peekedBytes = response.peekBody(byteCount = safeLimit + 1).bytes()
-    if (peekedBytes.size <= safeLimit) return String(peekedBytes, Charsets.UTF_8)
-    val preview = String(peekedBytes, 0, safeLimit.toInt(), Charsets.UTF_8)
+    if (peekedBytes.size <= safeLimit) return String(peekedBytes, charset)
+    val preview = String(peekedBytes, 0, safeLimit.toInt(), charset)
     return "$preview\n…(body truncated: shown $safeLimit bytes)"
 }
 
@@ -309,8 +310,11 @@ private fun MediaType?.isProbablyTextual(): Boolean {
         subtypeValue.contains("x-www-form-urlencoded", ignoreCase = true)
 }
 
-// Это helper проверки, можно ли при текущем уровне логировать обычные HTTP-события.
-private fun EshretTalkerLevel.allowsRequestLogging(): Boolean = when (this) {
+// Это проверка, надо ли при текущем `settings.logLevel` логировать обычный трафик
+// (исходящие запросы и успешные ответы). Здесь logLevel работает как verbosity-дайл:
+// только VERBOSE/DEBUG включают подробный трафик, на INFO и выше остаются лишь ошибки
+// (см. ветки 4xx/5xx и сетевого сбоя — они логируются независимо от этого флага).
+private fun EshretTalkerLevel.allowsTrafficLogging(): Boolean = when (this) {
     EshretTalkerLevel.VERBOSE,
     EshretTalkerLevel.DEBUG -> true
 
@@ -322,19 +326,4 @@ private fun EshretTalkerLevel.allowsRequestLogging(): Boolean = when (this) {
     EshretTalkerLevel.CRITICAL,
     EshretTalkerLevel.HTTP_REQUEST,
     EshretTalkerLevel.HTTP_RESPONSE -> false
-}
-
-// Это helper проверки, можно ли при текущем уровне логировать HTTP-ошибки.
-private fun EshretTalkerLevel.allowsErrorLogging(): Boolean = when (this) {
-    EshretTalkerLevel.VERBOSE,
-    EshretTalkerLevel.DEBUG,
-    EshretTalkerLevel.INFO,
-    EshretTalkerLevel.NAVIGATION,
-    EshretTalkerLevel.SUCCESS,
-    EshretTalkerLevel.WARNING,
-    EshretTalkerLevel.ERROR,
-    EshretTalkerLevel.CRITICAL -> true
-
-    EshretTalkerLevel.HTTP_REQUEST,
-    EshretTalkerLevel.HTTP_RESPONSE -> true
 }

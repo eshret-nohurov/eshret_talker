@@ -16,7 +16,15 @@ class EshretTalker(
     private val config: EshretTalkerConfig = EshretTalkerConfig(),
     // Это список внешних sink-приёмников логов.
     extraSinks: List<EshretTalkerSink> = emptyList(),
+    // Это источник текущего времени. Вынесен в зависимость, чтобы записи журнала были
+    // детерминированными в тестах; в проде используется системное время по умолчанию.
+    private val clock: () -> Long = { System.currentTimeMillis() },
+    // Это постоянное хранилище сессий (опционально). Если задано — все логи текущего запуска
+    // сохраняются на диск целиком, без ограничения maxEntries, и переживают перезапуск.
+    private val sessionStore: EshretTalkerSessionStore? = null,
 ) {
+    // Это публичный доступ к хранилищу сессий для UI (список/чтение/удаление сессий).
+    val sessions: EshretTalkerSessionStore? get() = sessionStore
     // Это счётчик id для стабильной идентификации записей.
     private val nextId = AtomicLong(1L)
 
@@ -70,7 +78,7 @@ class EshretTalker(
             // Это итоговая запись журнала.
             EshretTalkerLogEntry(
                 id = nextId.getAndIncrement(),
-                timestampMillis = System.currentTimeMillis(),
+                timestampMillis = clock(),
                 level = level,
                 tag = tag,
                 message = message,
@@ -83,7 +91,7 @@ class EshretTalker(
         // Это обновление in-memory буфера с ограничением длины.
         runCatching {
             _logs.update { current ->
-                (current + entry).takeLast(config.maxEntries)
+                appendCapped(current = current, entry = entry, maxEntries = config.maxEntries)
             }
         }
 
@@ -92,6 +100,10 @@ class EshretTalker(
         sinks.forEach { sink ->
             runCatching { sink.log(entry) }
         }
+
+        // Это сохранение записи в постоянную сессию (если хранилище подключено). В отличие от
+        // in-memory буфера выше, сюда уходят ВСЕ записи сессии, без ограничения maxEntries.
+        sessionStore?.let { store -> runCatching { store.append(entry) } }
     }
 
     // Это подробный технический лог.
@@ -179,6 +191,26 @@ class EshretTalker(
             throwable = throwable,
         )
     }
+}
+
+// Это добавление записи в буфер с ограничением длины за одну аллокацию.
+// Старый вариант `(current + entry).takeLast(maxEntries)` аллоцировал список ДВАЖДЫ на каждый
+// лог (сначала склейка, потом takeLast) — на горячем пути (частые HTTP/verbose-логи) это лишний
+// мусор и нагрузка на GC. Здесь при заполненном буфере собираем результат одним проходом.
+private fun appendCapped(
+    current: List<EshretTalkerLogEntry>,
+    entry: EshretTalkerLogEntry,
+    maxEntries: Int,
+): List<EshretTalkerLogEntry> {
+    // Это вырожденный случай: буфер отключён, держим только sink-вывод.
+    if (maxEntries <= 0) return emptyList()
+    // Это быстрый путь, пока буфер не заполнен: одна аллокация на склейку.
+    if (current.size < maxEntries) return current + entry
+    // Это вытеснение самых старых записей: оставляем последние (maxEntries - 1) и добавляем новую.
+    val result = ArrayList<EshretTalkerLogEntry>(maxEntries)
+    result.addAll(current.subList(current.size - (maxEntries - 1), current.size))
+    result.add(entry)
+    return result
 }
 
 // Это helper преобразования stack trace в строку.

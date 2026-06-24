@@ -10,7 +10,9 @@ import okhttp3.Response
 data class EshretTalkerOkHttpLoggerSettings(
     // Это общий флаг включения сетевого логгера.
     val enabled: Boolean = true,
-    // Это минимальный уровень подробности для сетевых логов.
+    // Это уровень подробности сетевых логов, работающий как verbosity-переключатель:
+    // VERBOSE/DEBUG — логируется весь трафик (запросы и успешные ответы);
+    // INFO и выше — обычный трафик подавляется, остаются только ошибки (4xx/5xx и сетевые сбои).
     val logLevel: EshretTalkerLevel = EshretTalkerLevel.DEBUG,
     // Это флаг показа тела ответа.
     val printResponseData: Boolean = true,
@@ -34,8 +36,17 @@ data class EshretTalkerOkHttpLoggerSettings(
     val printRequestHeaders: Boolean = false,
     // Это флаг показа дополнительных сведений по запросу.
     val printRequestExtra: Boolean = false,
-    // Это набор headers, которые надо скрывать в логах.
-    val hiddenHeaders: Set<String> = emptySet(),
+    // Это набор headers, которые надо скрывать в логах (имена сравниваются регистронезависимо).
+    // Безопасный дефолт живёт ИМЕННО здесь, а не в конструкторе интерсептора: иначе любой
+    // пользовательский EshretTalkerOkHttpLoggerSettings(...) молча обнулял бы маскирование
+    // и Authorization/Cookie утекали бы в журнал.
+    val hiddenHeaders: Set<String> = setOf(
+        "authorization",
+        "cookie",
+        "set-cookie",
+        "x-api-key",
+        "x-access-token",
+    ),
     // Это конвертер тела ответа в строку для кастомного отображения.
     val responseDataConverter: ((Response) -> String?)? = null,
     // Это фильтр исходящих запросов.

@@ -22,6 +22,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
 }
 
 kotlin {
@@ -32,6 +36,13 @@ kotlin {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
-    implementation(libs.kotlinx.coroutines.core)
+    // coroutines-core идёт через api: тип StateFlow присутствует в публичной сигнатуре
+    // EshretTalker.logs, поэтому потребители core должны получать его транзитивно.
+    api(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
+
+    testImplementation(libs.junit)
+    // org.json встроен в Android (прод-зависимость не нужна), но JVM-тестам хранилища сессий
+    // нужна явная реализация на classpath.
+    testImplementation(libs.json)
 }

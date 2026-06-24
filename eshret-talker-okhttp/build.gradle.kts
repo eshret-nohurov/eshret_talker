@@ -22,6 +22,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
 }
 
 kotlin {
@@ -33,4 +37,7 @@ kotlin {
 dependencies {
     api(project(":eshret-talker-core"))
     implementation(libs.okhttp)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
 }
