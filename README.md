@@ -1,5 +1,6 @@
 # eshret_talker
 
+[![build](https://github.com/eshret-nohurov/eshret_talker/actions/workflows/build.yml/badge.svg)](https://github.com/eshret-nohurov/eshret_talker/actions/workflows/build.yml)
 [![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)](https://developer.android.com/)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![JitPack](https://jitpack.io/v/eshret-nohurov/eshret_talker.svg)](https://jitpack.io/#eshret-nohurov/eshret_talker)
